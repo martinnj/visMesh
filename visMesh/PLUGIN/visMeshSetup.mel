@@ -1,0 +1,22 @@
+// Below is MEL script commands used to load the plugin.
+
+// If the plugin is in the pluginsdir but does not autoload:
+loadPlugin visMesh;
+
+// Create a transform node so the mesh can be moved easily.
+createNode transform -n visMesh1;
+
+// Create a mesh node that can be rendered.
+createNode mesh -n visMeshShape1 -p visMesh1;
+
+// Add a default shader to the mesh.
+sets -add initialShadingGroup visMeshShape1;
+
+// Create our actual node
+createNode visMesh -n visMeshNode1;
+
+// Connect the scenes time attribute to our input attribute.
+connectAttr time1.outTime visMeshNode1.time;
+
+// Connect the outputMesh from our node to the mesh node.
+connectAttr visMeshNode1.outputMesh visMeshShape1.inMesh;

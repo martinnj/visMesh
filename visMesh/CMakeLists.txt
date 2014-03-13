@@ -1,0 +1,27 @@
+#-----------------------------------------------------------------------------
+IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+  MESSAGE(
+    FATAL_ERROR
+    "We only allow out-of-source build."
+    )
+ENDIF()
+
+IF(COMMAND cmake_policy)
+  CMAKE_POLICY(SET CMP0003 NEW)
+ENDIF(COMMAND cmake_policy)
+
+PROJECT(MayaVis)
+
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+
+SET(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
+
+IF (MSVC)
+  ADD_DEFINITIONS(-D_SCL_SECURE_NO_WARNINGS)
+  ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
+ELSE (MSVC)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+ENDIF(MSVC)
+
+
+ADD_SUBDIRECTORY(PLUGIN)

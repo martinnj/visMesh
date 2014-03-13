@@ -11,3 +11,12 @@
 *.lai
 *.la
 *.a
+
+
+# Tex
+*.aux
+*.log
+*.out
+*.toc
+*.nav
+*.snm

@@ -1,0 +1,351 @@
+\section{Analysis and Design}
+This section of the report covers the analysis of the problem and the design of
+a solution to this problem. It includes decisions about premake systems, 3D
+applications and the design of a mesh- and simulator interface.
+
+\subsection{Platforms}
+\label{sec:platforms}
+% Platform stuff (Why: Cmake, Maya, C++)
+
+A general wish for the visualization system is that it should be platform
+independent. To avoid having to maintain 2-3 different build profiles such as
+a Unix Makefile, Visual Studio project and XCode project, or similar files, a
+premake system had to be chosen.
+
+As choices for the premake system three pieces of software came up:
+\begin{enumerate*}
+  \item Premake - \myurl{http://industriousone.com/premake}
+  \item CMake - \myurl{http://www.cmake.org/}
+  \item SCons - \myurl{http://www.scons.org/}
+\end{enumerate*}
+
+All three systems are free and promise total compatibility with all the operating
+systems. Both Premake and CMake uses their own syntax to define projects while
+SCons uses python, which gives great flexibility when it comes to configuring
+the project since it allows full use of the python language. The existing
+libraries (Chan-Vese and DSC) both used CMake as premake system, giving a strong
+incentive to continue using it.
+
+Since I would need to link/include a lot of files from Mayas devkit in order to
+complete the plugin, an automatic way of detecting the Maya location was needed.
+Neither SCons or Premake had any built-in or user supplied features that allowed
+this, but a CMake user created and shared one such module\footnote{\myurl{
+https://github.com/frarees/Maya-cmake}}. As long as the Maya install directory
+is standard, it will work just fine.
+
+Since I had no prior experience with any of the systems, and they seem like they
+have a similar learning curve, the decision of a premake system was based on
+the ability to find Maya by itself, and the preferences of the researchers that
+will maintain the plugin afterwards. In the end CMake was chosen as a premake
+system in order to smooth out interacting with existing projects.
+
+There is a number of 3D modelling programs available, but I only have experience
+with a small number of them. Additionally the researchers had previous
+experience with Autodesk Maya. This, and the fact that Maya ships for both
+Windows, Linux and OS X lead to the selection of Maya as the framework for the
+visualization plugin.
+
+% There is only very few widely used 3D modelling programs in general, and even
+% fewer that are actually available on several platforms. There was not strong
+% opinion on choice of software from the researchers, but they did have experience
+% with Maya from previous projects, so it was selected as the framework for the
+% visualization plugin.
+
+% As written in Section \ref{sec:pluginsystem} there is a choice of languages
+% involved in creating a Maya plugin. For this project C++ was chosen because it
+% is a very efficient language when written properly, and both the DSC and
+% Chan-Vese libraries are written in C++, which will make integrating them a lot
+% easier.
+
+\subsection{Simulation}
+\label{sec:sim}
+The original goal of the plugin was to create a new way to visualize and animate
+the steps and result of a Chan-Vese image segmentation without having to do it
+in a custom-made OpenGL application, as is the current solution. The primary
+input for the plugin will be meshes extracted by the provided Chan-Vese library.
+
+It was, however, decided early in the project that if it was possible to make a
+more uniform interface towards the plugin so that the Chan-Vese segmentation
+might be replaced by any other simulator. This would be a preferable solution.
+
+With that in mind we have to find a way that allows for an arbitrary simulator
+to be used in the plugin. The original plan was to ``hardcode''
+the interaction of the simulation into the plugin itself. This will not satisfy
+a generic method of simulation, since that would require a significant code rewrite
+every time the simulator was replaced. This leaves two ideas for integration:
+\begin{enumerate*}
+  \item Dynamically loading the simulator into the plugin, similar to the way Maya
+    loads plugins.
+  \item Create a ``interface'' specification/API that allows for an easier
+    integration, though not fully automatic.
+\end{enumerate*}
+
+The first solution is by far the most optimal for the user, but designing and
+implementing a way to dynamically load and unload code is a complex task, especially
+considering my time constraints and the fact that the plugin should work on both
+Linux, OS X and Windows.
+
+%The second solution is based in the same principle of virtual interfaces as the
+%virtual file system interface in the BUENOS kernel. Basically the a small class
+%should be supplied that overrides a given class specification that is shipped
+%with the plugin. An example here would be a header containing:
+
+The second solution is less optimal for the user but is significantly less
+complicated to implement. The idea is to implement an interface with a uniform
+way for a user to provide a new simulator. This is basically a C++ header file
+that specifies a set of methods that the simulator must provide in order to work
+with the plugin. This is the method I chose for the design in order to keep the
+project at a level I could realistically finish in time.  An example of such a
+header file can be seen here:
+\begin{lstlisting}
+[...]
+class simulator {
+public:
+  virtual void  initialize() = 0;
+  virtual mesh* getMesh() = 0;
+  virtual void  step() = 0;
+}
+[...]
+\end{lstlisting}
+To add a new simulator into the plugin the class will then just need to be
+implemented, similar to this:
+\begin{lstlisting}
+#include <simclass.h>
+
+class mySim : public simulator {
+  void  initialize() { [...] };
+  mesh* getMesh() { [...] };
+  void  step() { [...] };
+}
+\end{lstlisting}
+The new \texttt{mySim} class will do the actual conversion from whatever
+input/output the simulator needs and into the specs of the plugin. The above is
+a simplified example; a way to pass multiple arguments to the simulator should
+be specified.
+
+This approach would mean that the plugin must be recompiled in order to fit a
+new simulator, and it would be unable to fit several simulators at once. These
+are however acceptable trade-offs, since the wish to add a generic simulator
+approach was not part of the original plan.
+
+The interface should provide a set of functions that allow for some control.
+The current implementation will need the following set of functions:
+\begin{itemize}
+  \item \texttt{Initialize}: A call that allows the plugin to initialize the
+    simulator. After this call, the simulator should be ready to work. This
+    function should include a method that allows for the plugin to pass
+    parameters to the simulator.
+  \item \texttt{getMesh}: This method should return a mesh to the plugin in some
+    mesh format The mesh should correspond to the current state of the
+    simulation.
+  \item \texttt{step}: A method that causes the simulator to simulate a new
+    timestep. This method should be overrideable with a version that takes
+    ``step-size'' as an argument, giving finer control of the simulation.
+  \item \texttt{getArguments} This method returns an array of strings that are
+    the names of the simulation parameters. This is meant to allow the user to
+    tell the plugin what sort of parameters it needs. The input from these
+    parameters will be used to initialize the simulator.
+\end{itemize}
+
+\subsubsection{Chan-Vese}
+Since the specific goal of this project was visualizing results from a Chan-Vese
+image segmentation, an interface for the Chan-Vese simulator will need to be
+created.
+
+The Chan-Vese library itself provides very simple and clean access. Currently it
+can be ``warm-started'' from any DSC mesh by loading it into the library at
+runtime. It also allows for direct extraction of a segmentation using a single
+function call. These simple ways to interact with the simulator will make
+the virtual simulator class even simpler to write.
+
+How to use the DSC data extracted from the simulator is covered in Section
+\ref{sec:data}.
+
+\subsection{Datastructure}
+\label{sec:data}
+As with the simulator it was a wish that the plugin could have its internal mesh
+structure changed without significant work. This leads to me designing an
+additional interface, using the same integration strategy as with the simulator.
+
+Again, this is not a strictly needed feature, but would improve the usefulness
+of the plugin greatly as it will allow researchers to change mesh structures as
+often as they wish. This is especially useful when the simulator is changed,
+since it might not be using a DSC mesh but some entirely new mesh structure.
+
+Just like with the simulator we wish to create a class definition that allow
+future users to create easy bridges into the plugin. Such an interface should
+have the following functionality:
+\begin{itemize}
+  \item \texttt{vertices}: The mesh should provide a way to access its vertices.
+  \item \texttt{faceCounts}: Access to an array of integers telling how many
+    points are part of each face.
+  \item \texttt{faceConnects}: Access to an array of integers telling which
+    verts are part of each face.
+  \item \texttt{save/load}: The mesh should preferably be able to save/load
+    itself from a file. It is currently not clear if this is needed since the
+    simulator is responsible for providing meshes in certain states, and the
+    plugin itself should be capable to provide save/load support with Mayas own
+    format.
+\end{itemize}
+
+%TODO: Figure this out :P
+%It is still unclear whether or not it would be beneficial for the mesh to
+%provide an iterator over the vertices instead of direct access to the vertices
+%themselves. An iterator would clearly complicate mesh writing, so for now there
+%is no plan to include such a construction in the virtual mesh interface.
+
+\subsection{Visualizing Results}
+
+There is two ways to make Maya render the results from the simulator:
+\begin{enumerate*}
+  \item Define my own mesh type in Maya and write my own OpenGL shader for it.
+  \item Use a generic mesh and shader that is already contained in Maya.
+\end{enumerate*}
+
+Maya uses OpenGL to draw its viewports and renders. Drawing in them is done by
+adding draw requests to Mayas internal drawing queue.  Adding things to the
+queue is done by overriding the \texttt{draw} and \texttt{getDrawRequests}
+methods in Mayas \texttt{MPxSurfaceShapeUI} class. Maya will then ask the plugin
+to tell it how to render the surface and provide the plugin with render
+information such as shading type or if it should be rendered as
+wireframe/vertices. This approach allows for great control of the rendering but
+also takes up a lot of code and time.
+
+The second option is to use a generic mesh provided as a DG node by Maya. This
+node allows us to create a renderable mesh in Maya without doing any actual
+work. Maya even provides a shader for use in rendering.
+
+After spending some time looking into writing my own mesh and shader before switching to
+the built-in mesh and shader to avoid spending time on a details
+that is not a strict part of the project. The time saved by not having to write
+my own mesh and shader was instead spent creating the API's needed for the
+generic simulator and mesh interactions. Adding the generic mesh and a shader
+to a Maya scene only takes two lines of MEL code:
+\begin{verbatim}
+[...]
+createNode mesh -n myMeshNode1
+sets -add initialShadingGroup myMeshNode1
+[...]
+\end{verbatim}
+
+\subsubsection{Integrating Into Maya}
+
+Because all Maya plugins must define an entry point and register their DG/DAG
+nodes, the design must contain some sort of main class that will tell Maya
+where the rest of the plugin is located and how to use it.
+
+As we discovered in Section \ref{sec:Maya} if we wish to represent anything
+persistently in Maya, we will need to add at least one node to the DG. This node
+should be responsible for controlling the simulation and meshes through the
+simulation and mesh interfaces described in sections \ref{sec:sim} and
+\ref{sec:data}.
+
+Since we want to be able to animate an entire simulation, the plugin needs to
+be able to calculate/fetch the mesh based on what frame the Maya viewport is
+currently in. I came up with two ways to provide this functionality in the
+plugin:
+\begin{itemize*}
+  \item \textit{Delta calculations}: I develop a method for calculating the
+    change in the mesh allowing us to calculate a mesh given a starting mesh and
+    a set of delta operations.
+  \item \textit{Frame storage}: The plugin stores a complete copy of the mesh at
+    each frame and makes sure only the relevant mesh instance is visible at any
+    given frame.
+\end{itemize*}
+Both methods provide up- and downsides: The delta method will require a very
+low memory load as long as the mesh do not change significantly per frame, but
+it will mean that the mesh will be recalculated every time the time slider in
+Maya is moved. Depending on the complexity of the mesh and the amount of
+changes per frame, skipping 100 frames ahead might incur a significant
+time-penalty while the plugin calculates the mesh from some initial state. A way
+around this would be to implement intermediate states: for instance, the plugin
+could save the entire mesh every 10 frames, so it would only ever need to
+calculate a maximum of nine time steps. This would change the load characteristic
+to being less calculation heavy but require more memory or disk space.
+The combination of Chan-Vese and DSC also pose another problem for the delta
+method: There is no guarantee that vertices survive between time steps. So apart
+from calculating the movement of vertices, I would also need to design a way for
+the plugin to change the vertex/edge configuration, incorporating this would
+mean each delta step would take up even more memory, and for steps where vertex
+correlation cannot be established, vertices and edges might be needlessly
+deleted and recreated.
+
+The second method is more straightforward: for each time step, create a
+surface that represents the state of the simulated mesh at that specific time
+step. A method should be devised to make sure only the correct instance of the
+mesh is shown at any one time. This approach have a very heavy memory load since
+it will maintain a complete copy of the mesh for each single state. But it will
+require no re-computation of the mesh unless the entire simulation is rerun. A way
+to decrease the memory load of this approach can be to cache most of the mesh
+instances to a file on the harddrive and only load one or a few of the meshes.
+This will slow the plugin down since harddrive access is slower than memory, but
+can reduce the memory footprint of the software significantly for longer
+simulations with complex meshes.
+
+The choice between the two options were made based on the chance of me being
+able to complete the implementation, which was based on the time it would
+require to develop and implement. Because of the extensive development needed to
+create the delta solution I have chosen to go with the simpler \textit{frame
+storage} solution.
+
+%Write about how to implement the storage and how it affects the DG design stuff
+In order to implement this, a way of representing the mesh instances shall be
+devised:
+
+\begin{enumerate}
+  \item \textit{Internal representation}: Each mesh instance is saved as data in
+    the DG node and is not visible to Maya. When Maya or any other node requests
+    the output plug, the node will respond with the appropriate mesh from its
+    internal storage.
+  \item \textit{External representation}: The mesh instances are created as
+    separate DG nodes that will be connected to the DG node that controls the
+    simulation.
+\end{enumerate}
+
+Again there is two solutions with different strengths and weaknesses. The
+internal solution is a simpler approach since I do not need to design additional
+DG nodes, but the external representation approach will reduce the size of the
+master DG node and create a smaller, simpler mesh node.
+
+The external representation would mean two simple nodes, but the connections
+between them might go on and be a more complicated since the master node would
+need to be created with an arbitrary number of input ``plugs''. Creating a plug
+that acts as an array is possible using the \texttt{MFnAttribute::setArray()}
+method. It is, however, unclear whether the array of
+meshes should be set as inputs or outputs of the master node. Both makes sense
+since they are generated by the master DG node, but they also makes sense
+as input if we create the plugin so that only the master node gets asked to
+render itself. This last method of using them as input is similar to the
+internal representation method, in the sense that Maya will not actually render
+many different meshes, but only one, that acts differently at different
+time steps. If the mesh nodes gets created as inputs for the master node, they
+cannot be re-purposed if the simulation parameters change and will as such need
+to be deleted and unplugged. If the nodes are created as outputs for the master
+node however, they can re-purposed by marking their input as dirty, causing them
+to request new input (the mesh from the simulator).
+
+The internal representation requires only a master node. It will then create an
+internal array of a mesh data class that it can use and manage for itself. When
+the attribute change it will mark itself ``dirty'', ensuring it get properly
+recalculated at render time. I chose to implement this methods since it
+simplifies the DG implementation and should provide easier integration with the
+generic mesh interface described in Section \ref{sec:data}.
+
+\subsection{Summing Up the Design}
+
+Based on the above analysis and the decisions made, I have created the following
+diagram (Figure \ref{fig:design}) illustrating the different modules. It's not a
+strict UML or class diagram, but simply an illustration of the proposed overall
+segmentation of the plugin.
+
+\graphicc{0.8}{img/module-design.png}{A diagram showing the modular layout of
+the plugin, this is not a UML diagram but simply a picture produced to give
+clarity over the layout of the plugin.}{fig:design}
+
+As seen in Figure \ref{fig:design} the plugin will consist of a main plugin
+module that registers the plugin and the DG node for the plugin. The plugin will
+register one DG Node in order to represent itself in the viewport. The DG node
+will use the virtual simulator- and mesh classes to allow for easy replacement of
+simulators and meshes without heavily rewriting the code. When looking at the diagram it
+can look like there can be two simulators/meshes active at the same time per
+node, this is not the case.

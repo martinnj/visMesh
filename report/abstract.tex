@@ -1,0 +1,25 @@
+%TODO: Make this look pretty and write it... duuh.. :P
+\hspace{1cm}\\[5cm]
+{\huge Abstract}
+\\\HRule\\
+
+The Image-group on DIKU currently work with a number of simulations and mesh
+structures, each requiring a custom tool for visualization. It is the wish that
+a new tool be created to unify the visualization process.
+
+The design developed in this project, visMesh, is a C++ plugin for Autodesk Maya
+that includes a simple virtual interface for plugging in both new simulators and
+mesh structures. A prototype of the plugin was developed and tested using a
+discretized 3D Chan-Vese segmentation library and the DSC mesh framework.
+
+The prototype was tested and compared to the current OpenGL application that is
+used to visualize the Chan-Vese segmentations. The comparison was based on
+visualization results, CPU- and memory usage both during simulation and when
+only displaying the results.
+
+The prototype was found to solve a number of the problems with the current
+OpenGL solution, amongst others: rendering simulations as films, low framerate
+with complex meshes and stepping back and forth in a simulation. Since the
+prototype is not feature complete, a number of improvements have been suggested
+to increase the usability of the tool.\\
+\HRule

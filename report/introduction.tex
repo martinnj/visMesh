@@ -1,0 +1,47 @@
+\section{Introduction}
+
+For my bachelors project I helped DIKUs Image-group by designing and
+prototyping a tool to help them visualize simulations and mesh
+structures. Currently their only way of visualizing their research are in a crude
+OpenGL applications that are written specifically for each project.
+
+My supervisors are currently working with image segmentation in the form of a
+Chan-Vese model based segmentation algorithm and a moving mesh framework called
+Deformable Simplicial Complexes (from here on just called DSC), so my project
+will be centered around creating a visualization tool for those two projects
+that can be adapted to fit any other project.
+
+The implementation of the project will be in the shape of a Autodesk Maya plugin,
+which will allow the user to visualize the results of their simulation and
+easily provide parameters for the simulation to observe changes. These
+visualizations can be used both internally to help debug an algorithm or be
+rendered to images or animations that can be published.
+
+\graphicc{0.5}{img/not_so_pretty_mix.png}{A mix of two pictures rendered in the
+resulting Maya plugin. The shape is loaded from a DSC file into the simulator,
+a shader have then been applied to the shape. The left image is
+rendered with Mayas default software renderer, the right one is rendered with Mayas
+Mental Ray renderer.}{fig:intro}
+
+In this report I will first go over the theoretical knowledge needed to complete
+the plugin The DSC framework and what Simplicial Complexes are, and then
+move on to explain the Chan-Vese segmentation algorithm and how Autodesk Maya
+works. Afterwards I will cover my analysis of the problem and the design of a
+solution. The report will then describe the actual implementation of the plugin
+and the use of CMake to make future work and usage easier.
+
+Finally I will go over the results of the plugin and compare them to the
+current OpenGL solution and go over the changes that should be done in order to
+further improve the solution.
+
+The code can be obtained by writing to either me, Kenny or Ulrik (see frontpage
+for emails.)
+
+%Fra Torbens slide:
+%En indledning er:
+%En kort teaser, som for den forventede læser gør rede for, hvorfor projektet er in-
+%teressant, for state-of-the-art, for jeres resultater, og for forventninger til læseren.
+%
+%Tænk: Hvis en teknisk projektleder eller en studiekammerat skal læse indledningen
+%(men ikke resten af rapporten), hvad skal vedkommende da læse for - overordnet
+%- at forstå jeres projekt?

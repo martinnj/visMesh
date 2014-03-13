@@ -1,0 +1,116 @@
+\section{Segmentation}
+\label{sec:chanvese}
+The segmentation will be handled by the Chan-Vese method for image segmentation.
+This is a segmentation method that builds on the Level-Set method, which will
+also be explained in this section.
+
+\subsection{Level-Set Method}
+The level-set method is a method for tracking shapes or, in our case, interfaces.
+The level-set method uses a numerical function to determine whether a point is
+in the shape, on the interface or outside without doing any parameterization of
+the edge. This proves valuable if the shape creates ``holes'' or merge with
+other shapes as no reparameterization is needed.
+
+In a 2D universe the level set method would then give us a curve $\Gamma$ that
+is the interface or edge in a figure. Doing this will require a helper function
+$\psi$ that can decide whether a given point is inside, on the shape or outside.
+The level-set method for the interface looks like this
+\[
+  \Gamma = \{ (x,y)|\psi(x,y)=0  \},
+\]
+assuming that $\psi$ returns 0 for any point on the interface. Extending $\psi$
+to have specific values for points inside or outside can increase the
+usefulness of the method. The challenge is to design a $\psi$ that gives useful
+data for a desired input.
+
+\subsection{Chan-Vese Segmentation}
+The Chan-Vese segmentation method is an image segmentation that uses the
+Level-Set method along with an energy function as $\psi$ to find and track
+contours in images. For a bi-level image where every pixel have a value of 0 or
+1, the Heaviside function can be used as $\psi$, giving all the pixels that are
+inside the shape:
+\[
+  H(x) = \left\{
+  \begin{array}{l l}
+    1 & \quad x \geq 0 \\
+    0 & \quad x = 0
+  \end{array}
+  \right.
+\]
+
+In order to track an interface, further modification is needed. This could be
+done by doing a comparison of the surrounding pixels. If the pixel in question
+is touching a pixel of value $0$, but is itself valued $1$, it would be on the
+interface. The $\psi$ function can then be expanded to return different values
+depending on the location of the pixel (See Figure \ref{fig:cv-interface} for
+an example.)
+
+\graphicc{0.5}{img/cv-interface.png}{Here the $\psi$ function returns 0 for
+pixels on the interface, $>0$ for pixels inside and $<0$ for pixels outside. Source:
+Chan and Vese \cite{cv01}}{fig:cv-interface}
+
+Energy functions are proposed in both \cite{cv01} and \cite{rc09}. They have the
+same basic structure, that consist of four weighted terms. Each term represent a
+feature of the image. The first term is the length of the edge. It is used to
+enforce a penalty for longer or short edges, allowing more detailed edges. The
+second term enforces a penalty for the area covered by the inside domain
+allowing us to change how much area we want inside the shape. The third and
+fourth term share a purpose, they work with the uniformity of the
+pixel-intensity of the for- and background of the image, respectively.
+
+Since the segmentation model I will work is modified to work on a 3D tetrahedral
+mesh. The first term is changed to weigh surface area.
+The second term weigh volume, and the third and fourth use a function that
+interpolates image values from the vertices of a tetrahedron. The complete
+energy function (from \cite{chanveseposter}) for the contour C is
+\begin{align*}
+  \text{Ê}(C) = &\mu \sum_{\alpha \in C}^{}A_\alpha \\
+  &+ v \sum_{\beta \in \Omega_{in}}^{} V_\beta \\
+  &+ \alpha_{in} \sum_{\beta \in \Omega_{in}}^{}\left(\text{Û}(p_\beta) - c_{in}  \right)^2 V_\beta \\
+  &+ \alpha_{out} \sum_{\gamma \in \Omega_{out}}^{} \left(\text{Û}(p_\gamma) - c_{out} \right)^2 V_\gamma \\
+\end{align*}
+
+%==============================================================================
+%TODO: Find the original CV article its [1] in cr09 and use that as reference?
+% A fitting energy functional for a segmentation of images have been written in
+% \cite{rc09}. I will show it here to provide an insight into the complexity of
+% the segmentation algorithm but offer no greater discussion on it since it
+% is far beyond the scope of this report. Before showing the functional itself a
+% few symbols must be established:
+% \begin{itemize*}
+  % \item We again use the Heaviside function $H$.
+  % \item $I$ is the image to be segmented.
+  % \item $\Omega$ is the domain of $I$.
+  % \item $p,v,\lambda_1$ and $\lambda_2$ is parameters for the function, set
+        % depending on what type of image you wish to segment.
+  % \item $c_1$ and $c_2$ is the averages in the regions of $I$ where $\phi \geq
+        % 0$ and $\phi < 0$. They're given as:
+        % \[
+          % c_1 = \frac{\int_\Omega I\cdot H(\phi) dx dy}
+                     % {\int_\Omega H(\phi) dx dy}
+          % ,
+          % c_2 = \frac{\int_\Omega I\cdot (1-H(\phi)) dx dy)}
+                     % {\int_\Omega (1-H(\phi)) dx dy}
+        % \]
+% \end{itemize*}
+
+% This taken into account the full functional will be:
+% \begin{align*}
+  % F(\phi) = &\mu{\Big(}\int_\Omega|\nabla H(\phi)| dx{\Big)}^p\\
+            % &+ v\int_\Omega H(\phi) dx\\
+            % &+ \lambda_1 \int_\Omega |I-c_1|^2 H(\phi) dx\\
+            % &+ \lambda_2 \int_\Omega |I-c_2|^2 (1-H(\phi)) dx
+% \end{align*}
+
+% The functional can be though of as four terms with their specific purpose:
+% \begin{itemize*}
+  % \item The first term will say something about the penalty put on the length of
+        % the edge for the segmentation. If a short edge is expected this should
+        % be set heavier than if a long intricate edge is expected.
+  % \item The second term is a penalty applied to the area of the segmentation, so
+        % if the result is expected to have a low area, this should be weighted
+        % heavier.
+  % \item The third and fourth term share a purpose, they work with the
+        % uniformity of the pixel-intensity, of the fore- and background of the
+        % image respectively.
+% \end{itemize*}

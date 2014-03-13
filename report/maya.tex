@@ -1,0 +1,85 @@
+\section{Autodesk Maya}
+\label{sec:Maya}
+The section will describe the way Autodesk Maya represents data internally and
+what we can do to be able to add our own code into the program through the
+plugin system.
+
+\subsection{Internal Representation}
+Maya represents all objects and operations in two internal graphs with different
+characteristics and purposes, the Dependency Graph (DG) and
+the Directed Acyclic Graph (DAG).
+
+\subsubsection{Dependency Graph}
+
+%TODO: meshes can be data in plugs, shapes are what is displayed.
+The DG is a directed graph consisting of a number of nodes. Nodes in the DG can
+have a number of attributes (called plugs) that can be used as either
+\textit{input}, \textit{output} or \textit{unconnectable}. The
+\textit{input/output} nodes define relationships between objects in Maya. All
+objects and modifiers in Maya is represented in the DG as one or several nodes.
+
+An example could be a map-displacement modifier with three input plugs and one
+output plug. Input plugs would be mesh data (not a mesh object, but simply the
+data needed to create one), an input displacement-map and an integer deciding
+strength. The output plug will then deliver mesh data that can be used as input
+to another modifier, or to render an actual mesh. Connectivity to such a node
+would then be that all other nodes that needs the output mesh data connects to
+the output plug and request the mesh data there. The input mesh data plug will
+need to be connected to a DG node that can provide a base mesh the modifier can
+work on. The integer plug can be set to be visible in the UI, so a user can
+specify it through a text/numeric-input field.
+
+In order to maintain consistency through the graph, plugs can be marked
+\textit{dirty}. If, for instance, we change the strength plug of the displacement
+node discussed before, the output plug will be marked dirty, and Maya will in
+turn mark all plugs that read the output plug as dirty, propagating the change
+across the entire DG. If any dirty plug is requested it will be recalculated. If
+any of its input plugs are dirty, they will propagate the recalculation request
+through the graph again. This way Maya only ever updates nodes if it has to.
+
+There can be several reasons for plugs to become dirty, and for them to be
+requested again. Plugs become dirty when they are unplugged/plugged-in (the DG
+can change as nodes are added), keyframes are changed or other attributes are
+modified. The most common reason a plug is called to be recalculated, is when a
+renderer calls for the final result of the DG.
+
+\subsubsection{Directed Acyclic Graph}
+
+Whereas the DG nodes usually is objects and modifiers in the Maya scenes, the
+DAG nodes are transformation nodes, locator nodes and similar unrenderable
+operations. DAG nodes specify operations to be performed inside the 3D space
+such as translation and rotation. DAG nodes are usually set as parents of DG
+nodes but these connections are not normally apparent.
+
+\graphicc{1}{img/dagdg-example.png}{An example scene in Maya with a single
+  object, a number of modifiers and dataflow- and relationship arrows.}{fig:dagdg}
+
+Figure \ref{fig:dagdg} shows an example scene in Maya, where a DG node that
+generates geometry based on user input provides a mesh for a surface noise
+generator. The generator outputs a mesh that the viewport, production renderers,
+or any other DG node that wishes so, can pull. Scale- and rotation transformation
+modifiers have been provided. The solid arrows represent data flowing through
+the graph, the dashed ones represents relationships; a parent will point to its
+child.
+
+\subsection{Plugin System}
+\label{sec:pluginsystem}
+Maya allows for several different forms of customization:
+\begin{itemize}
+  \item MEL-scripts (Maya Extended Langauge)
+  \item Python-scripts (interpreted within Maya itself.)
+  \item External python plugins through Mayas own modules.
+  \item C++ Maya plugins compiled and linked as dynamic libraries.
+\end{itemize}
+
+I will be writing a plugin using C++. This language was chosen for three reasons:
+both the DSC and Chan-Vese codebase I will be integrating with is written in
+C++, and the people that will use the plugin already have experience with C++
+which makes it easier to take over once my project have ended. Finally C++
+can be an extremely efficient language if written properly, providing only a
+minimum of overhead for the link between simulator and plugin.
+
+A C++ plugin gets compiled to a dynamic library, which on windows is called
+\textit{.mll} (this is actually a DLL file) and have two exported entry points
+called \texttt{initializePlugin} and \texttt{uninitializePlugin} which Maya will
+call when registering and deregistering the plugin respectively.

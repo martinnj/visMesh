@@ -1,0 +1,44 @@
+\section{Conclusion}
+In this report I have covered the basics of the Chan Vese image segmentation
+algorithm, the DSC mesh structure and the inner workings of Maya. I also
+designed a plugin for Maya that allows easy integration of any
+simulation and mesh structure into the plugin itself and act as a visualizer. To
+make it easier for user to compile on their own machine and to write
+new simulators, I used CMaketo help create build-files on both Windows, Linux
+and OS X.
+
+The plugin is designed with two general interfaces that allow plugging any
+simulator and any mesh structure into the plugin as long as they conform to the
+designed interface. The mesh interface only specifies how to retrieve mesh data
+from the mesh itself, and not how the mesh should behave or even how to write to
+it. This means that the user can do it any way he wants. The simulator interface
+specifies a way for the simulator to communicate what arguments it would like to
+have, a way to pass those arguments along, a way to make the simulator advance
+in time, along with a way to retrieve the mesh from the simulator. The plugin is
+designed with an internal mesh storage that saves all the previous steps of the
+simulator, so it can easily be browsed and rendered into an animation.
+
+During the project I implemented a prototype of the design. It is not feature
+complete and does not use the generic mesh interface since I was unable to
+implement it in time. The interface itself was implemented as a header file to
+make future work easier. The current prototype implements the generic
+simulator interface and the internal mesh store. It allows the simulator to ask
+for arguments and then return the users input on those parameters in order to
+control the simulation, frame by frame.
+
+I performed a number of tests of the plugin itself and did comparisons to the
+current OpenGL solution it was meant to replace. My tests showed that the
+plugin could perform all the tasks that the OpenGL solution could, and added a
+number of new features such as the ability to look at previous steps of the animation
+via the time line and changing simulation parameters without recompiling the
+solution as long as the simulator in question tells Maya what parameters it
+needs. The plugin works fine with the different Maya shaders, as long as they
+do not require UV mapping.
+
+Finally a number of fixes/improvements is proposed in Section \ref{sec:future}
+that will greatly increase the usability of the plugin and aid the user
+in testing their simulators/meshes or create visuals both static and animated to
+help in promoting or explaining different scientific methods.
+
+
+% END OF REPORT; TIME FOR APPENDIX

@@ -1,0 +1,364 @@
+\section{Implementation}
+This section covers the implementation of the plugin, the simulator and mesh
+classes as well as the CMake solution.
+
+Because the plugin registration part only requires very few lines it have been
+put in the same file as the DG node and for that reason they will also be kept
+in the same subsection (subSection \ref{sec:plugnode}) of the report. Since the
+design includes separate simulator- and mesh interface, these will be described
+in separate subsections.
+
+Both the plugin and the DG node is called visMesh (short for visualization mesh)
+but whenever visMesh is mentioned in the report, I am talking about the DG node
+specifically unless otherwise specified.
+
+The structure of the codebase is quite simple:
+\begin{table}[h]
+\begin{tabular}{c c}
+\begin{minipage}{7cm}
+\dirtree{%
+.1 SVN repository/project root.
+.2 contract.
+.3 Project contract.
+.3 Project description.
+.2 report.
+.3 \LaTeX files used for the report.
+.3 img.
+.4 Image files used in the report.
+.3 graphs.
+.4 Yed graph files.
+.2 visMesh.
+.3 cmake.
+.4 FindMaya.cmake.
+.3 PLUGIN.
+.4 include.
+.5 ChanVese.h.
+.5 gmesh.h.
+.5 gsim.h.
+.5 macros.h.
+.5 visMesh.h.
+.4 src.
+.5 ChanVese.cpp.
+.5 visMesh.cpp.
+.4 CMakeLists.txt.
+.4 visMeshSetup.mel.
+.3 CMakeLists.txt.
+}\end{minipage}
+&
+\begin{minipage}{7cm}
+\texttt{FindMaya.cmake}: CMake module to find Maya, see Section \ref{sec:cmake}.\\
+\texttt{ChanVese.h}: Header file defining the ChanVese simulator.\\
+\texttt{gmesh.h}: Header file defining the generic mesh class.\\
+\texttt{gsim.h}: Header file defining the generic simulator class.\\
+\texttt{macros.h}: Header file defining convenience macros.\\
+\texttt{visMesh.h}: Header file defining the plugin class.\\
+\texttt{ChanVese.cpp}: Implementation of the ChanVese simulator.\\
+\texttt{visMesh.cpp}: Implementation of the plugin and registration code.\\
+\texttt{CMakeLists.txt}: CMake file for the project.\\
+\texttt{PLUGIN/CMakeLists.txt}: CMake file for the plugin.\\
+\texttt{PLUGIN/visMeshSetup.mel}: Setup script for the plugin, see Section \ref{sec:melsetup}.\\
+\end{minipage}
+\end{tabular}
+\end{table}
+
+\subsection{Mesh}
+This subsection will explore the implementation of the mesh structures in the
+project. Note that the implementation of the mesh differs from
+the design. The differences and reasons behind is explained in this subsection.
+
+A virtual class for the generic mesh was implemented in
+\textit{PLUGIN/include/gmesh.h}, however due to time constraints there was not
+enough time to add it to the plugin itself.
+
+\subsubsection{Divided mesh data}
+In order to replace the generic mesh a new structure was adapted. This structure
+is inspired by how Maya stores mesh data. Each object consists of three lists:
+\begin{enumerate*}
+  \item \textit{Vertices}: This list stores all the vertices in the geometry.
+
+  \item \textit{Face Counts}: The $n$'th entry in this list contains the number
+    of vertices needed by the $n$'th face of the object.
+
+  \item \textit{Face Connects}: Contains the order in which the vertices should
+    be connected in order to form a complete face.
+\end{enumerate*}
+
+To create a mesh from the data I first read an entry in faceCounts, this entry
+describes how many vertices I should get to make the specific face, I then read
+that amount of entries from faceConnects, these entries are the indices of the
+vertices  to get in the vertex list in order to draw the face. To draw the
+next face we simple read the next entry in faceCount and read that amount of
+entries from faceConnects and get the appropriate vertices from those indices.
+It's important to mark how far we have moved through the faceConnects list since
+we should never read the same entry twice.
+
+To replace the generic mesh a number of smaller changes had to be made. The
+biggest change was that the \texttt{std::vector<gmesh>} that should contain the
+meshes was replaced by three other vectors:
+\begin{lstlisting}
+std::vector<MFloatPointArray> vertices;
+std::vector<MIntArray> faceCounts;
+std::Vector<MIntArray> faceConnects;
+\end{lstlisting}
+With this setup the $n$'th entry in the vectors contains the info that is needed
+to create the $n$'th mesh in Maya. This implementation also means that it does
+not correspond to the design laid out in Figure \ref{fig:design}, instead it
+will look like Figure \ref{fig:implementation}.
+
+\graphicc{0.8}{img/module-implementation.png}{Visualization of the
+  implementation, just like Figure \ref{fig:design}, this is not a UML diagram
+  but rather an illustration of the implementation.}{fig:implementation}
+
+This implementation means that the simulator must now be responsible for
+delivering the mesh data via the three functions that the mesh structure implemented
+before. This means that the method \texttt{virtual gmesh* getMesh() = 0;} is
+replaced with the three following methods:
+\begin{lstlisting}
+virtual MFloatPointArray getMeshVerts() = 0;
+virtual MIntArray getMeshFaceCounts() = 0;
+virtual MIntArray getMeshFaceConnects() = 0;
+\end{lstlisting}
+
+The lack of full-implementation of the mesh type does not have a significant
+performance impact. The work the mesh class should have done is simply moved
+from the mesh to the simulator. But some of the ease-of-customization is lost
+since placing a new mesh structure in the plugin itself will require more work.
+
+It is also worth noticing that the ability for the plugin to save meshes to files
+is not implemented. Any simulator that wishes to be able to resume after Maya
+have been closed should provide such functionality by itself.
+
+\subsubsection{DSC Mesh}
+There was only a little interaction with the DSC mesh in the implementation
+since the Chan Vese code takes care of all the simulation/segmentation. The only
+real work was the conversion from DSC to the Maya-like mesh structure.
+
+In order to do this I created a method in the \texttt{chanVeseSim} class that
+reused almost all of the code from the \texttt{draw} method already present in
+the \textit{dsc\_display.h} file. The first thing to do is to strip the OpenGL
+related code, four lines of code, and marking the place where it was
+drawing the OpenGL polygons. In this place I inserted code that took each
+triangle and instead added the vertices to the simulators internal vertex array,
+and then added the needed connectivity data by appending three (since all our faces
+are triangles) to the faceCount array for each face and then added a new number
+to faceConnects for each vertex. When coded, the loop to save a face from the
+DSC mesh looks like so:
+\begin{lstlisting}
+faceCounts.append(3);
+for (int i = 0; i < 3; ++i) {
+    V v = dsc.find_node(verts[i]).v;
+    faceConnects.append(vertices.length());
+    vertices.append(MFloatPoint(v[0], v[1], v[2]));
+}
+\end{lstlisting}
+
+This way of saving vertices creates redundant geometry data in the vertex list
+since all vertices are shared between at least three faces (any vertex in a
+tetrahedron) that vertex will get saved at least three times. Instead of just
+blindly adding vertices the simulator should check if it already have a vertex
+on that position and add an entry with that vertex's index to the faceConnects
+list. Again due to time restrictions, this was not added to the plugin.
+
+\subsection{Simulator}
+The simulator should provide a way to tell the plugin what parameters it wants,
+how to advance the simulation, along with some way of retrieving the mesh for
+the current state.
+
+\subsubsection{Virtual Simulator}
+Apart from the constructor and destructor the generic simulator
+(\textit{include/gsim.h}) defines the following virtual functions:
+\begin{itemize*}
+  \item \texttt{MStringArray getArguments}: Returns a list of names for the
+  parameters that the simulator wants Maya to show to the user.
+
+  \item \texttt{void initialize}: This functions gets used to initialize the
+  simulator. It takes a filepath (string) as argument, this file is the initial state of the
+  simulator, which allows for ``warm starting'' it. It also takes an array of
+  doubles as argument, this is the values of the arguments requested in the
+  function described above.
+
+  \item \texttt{void tick}: This function causes the simulator to advance one
+  time step.
+
+  \item \texttt{MFloatPointArray getMeshVerts}: Returns the vertices of the
+  mesh in the simulator.
+
+  \item \texttt{MIntArray getMeshFaceCounts}: Returns the face count data of
+  the mesh in the simulator.
+
+  \item \texttt{MIntArray getMeshFaceConnects}: Returns the face connectivity
+  data for the mesh in the simulator.
+\end{itemize*}
+
+At this point the only type of arguments the simulator accepts are floats. This
+is because I did not have time to implement a way for the simulator to tell the
+plugin what datatypes it expects for the different parameters. The double
+datatype was selected because it supplies precision enough for the current
+simulation purposes.
+
+
+\subsubsection{Chan-Vese Simulator}
+
+Normally a Chan-Vese segmentation takes several arguments (the $\mu$, v and
+$\lambda$ values) but since the current segmentation is not a correct
+implementation but a dummy sphere-interpolator it only takes two arguments, the
+radius of the sphere and the length of each timestep in the simulation.
+
+The method for initializing the segmentation is copied from the
+sample segmentation program provided with the segmentation library. The greatest
+difference is that the simulator gets its parameters from the plugin instead of
+having them hardcoded, and that an initialization \textit{*.dsc} file can be defined.
+If no initialization file is specified, it will simply draw a small cube.
+
+When the simulator class is asked to perform a step, it will check if the step size is
+above 0. If it is, it will ask the segmentation to perform a step with the
+specified size. If the size is 0 or below, the simulator class will write an error and return
+without changing anything.
+
+
+\subsection{Plugin and DG Node}
+\label{sec:plugnode}
+This subsection will cover the implementation of the plugin registration code
+and the code that makes up the DG node.
+
+The only two things needed to register a plugin is specific functions that need
+to be exported visibly in the finished \textit{.mll} file. The two functions are
+\texttt{MStatus initializePlugin(MObject obj)} and \texttt{MStatus
+  uninitializePlugin(MObject obj)}.
+
+Both take a Maya wrapper \texttt{MObject} as argument and returns a
+\texttt{MStatus}. The \texttt{MObject} will become the object that Maya sees as
+the plugin itself when registered, and the \texttt{MStatus} is used to tell Maya
+if the plugin managed to register or deregister correctly. An example of a
+failure would be if the plugin attempted to register a DG node with a node id
+that is already in use.
+
+When registering the plugin I do two things: register the plugin information
+such as author, version and needed Maya API and register the DG node.  After
+these things are done the \texttt{initializePlugin} function returns success to
+Maya to let it know that everything should work smoothly now.
+
+When uninitializing the plugin, the only thing done is to deregister the DG node
+and tell Maya whether or not we succeeded in it.
+
+Creating  a DG node in Maya is done by implementing a class that overrides
+\texttt{MPxNode} and then overriding/implementing the following functions/static
+variables:
+\begin{itemize*}
+  \item The constructor (can be empty).
+  \item A virtual destructor (can be empty).
+  \item \texttt{virtual MStatus compute (const MPlug\& plug, MDataBlock\& data)}\\
+    This is called whenever a plug on the node is marked dirty and needs to be
+    recomputed. This is the workhorse of the node.
+  \item \texttt{static void* creator()}\\
+    This is called by Maya when it wants to make an instance of the node, in my
+    case the only thing it does is to return an instance of the constructor for
+    the class.
+  \item \texttt{static MStatus initialize()}\\
+    This is called after the creator and sets up attributes for the node and
+    relations between them, after this is called, the node must be able to
+    function properly.
+  \item \texttt{static MTypeId id}\\
+    Static variable defining the ID of the node type. This must be unique, any
+    clashes will result in failure at registration.
+\end{itemize*}
+
+As written above the real workhorse of the plugin is the \texttt{compute}
+method. This is the method that will be called by Maya whenever the plugins
+output nodes are dirty and needs to be recomputed. Every output plug is set up
+with a relationship to all of the input plugs it is relaying on. The visMesh
+node only have on output plug, but this plug relies on all of the input plugs,
+so whenever one of the input plugs changes, the output plug gets marked as
+\textit{dirty}. This allows any other nodes that ask for the output to see that
+it is not ``up-to-date'' and request that the visMesh node recomputes itself.
+
+\texttt{compute} gets called with two arguments, the \texttt{MPlug\& plug} that
+should be recomputed and a \texttt{MDataBlock\& data} that contains the data for
+all the nodes input plugs. The current implementation of \texttt{compute} will
+first do a check to see if any of it's input plugs (excluding the time plug)
+have changed, this is important since if any of them have changed, that means
+the parameters for the simulator should be updated. If the plugs are all the
+same (no parameters have changed), the node will check if the frame requested by
+Maya is within what is currently simulated. If the data that belongs in that
+frame is stored it will create a mesh object and pass it to the output plug and
+mark it as \textit{clean}. If the plugs are the same, and the mesh is not in
+store, visMesh will run the simulator until the requested mesh gets generated
+and then pass it to the output plug. If the configuration have changed visMesh
+will delete all it's current mesh data and re-initialize the simulator with the
+new parameters and re-simulate until it have simulated the requested frame.
+
+\subsection{CMake}
+\label{sec:cmake}
+
+The CMake files are responsible for telling CMake how to create a project/make
+file and help make development and cross platform building easier.
+
+In order to compile and link the DSC framework the LAPACK/BLAS module is
+needed. CMake ships with a module that can find it if it's installed.
+I also wished to find Maya automatically to use its header files and libraries,
+as written in Section \ref{sec:platforms}. A Github user had
+already created a CMake module for this, using this module getting all the
+paths for Maya's libraries and include files was as simple as writing
+\texttt{FIND\_PACKAGE(Maya)} in the CMake file for the plugin.
+
+The plugin currently have two CMake files, one for the overall project and one for
+the plugin itself. This will provide an easier way to add new classes to the
+plugin without touching the existing code, since a new folder can be made and
+added as a sub directory to the main CMake file.
+
+The second CMake file, the one for the plugin itself, is responsible for finding
+both the Maya and LAPACK paths along with the paths for the DSC project files.
+I did not have time to develop a proper way of automatically detecting the DSC
+project files, so instead a path to the root is given and a CMake configuration
+file in the DSC project will create the needed paths. In order to set the path
+the following lines are needed:
+\begin{lstlisting}
+SET(DSC_PROJECT_DIR "C:/SVN/BSc/dsc-repo/CODE/DSC_PROJECT")
+FIND_PACKAGE(DSC_PROJECT)
+\end{lstlisting}
+The plugin will build on both Windows and OS X.\footnote{It have not be tested
+on Linux, but a build should be possible as long as Maya, DSC, Chan-Vese etc.
+are installed correctly.} The plugin will work under different Maya version,
+but will need to be compiled with libraries for each specific version and with
+a fairly modern compiler, for more details see \cite{Mayareq}.
+
+\subsection{Node Setup}
+\label{sec:melsetup}
+
+Even though the plugin itself is written in C++, the plugin needs to be loaded
+into Maya and the visMesh DG node needs to be placed in the scene. In order to
+make this task easy, I have created a MEL script that will load the plugin,
+create a transform node (so the mesh can be moved around), add a generic mesh
+node that ships with Maya (to display the mesh data visMesh calculates), adds a
+shader to the mesh, and create the visMesh node itself in the scene. Lastly the
+script will connect the visMesh output plug to the mesh-nodes input plug and
+connect the scenes time to visMeshs time input plug.
+
+All of this could be done by hand, but this script makes the whole process
+automatic in order to save the users time. The script is written below and is
+commented to clarify what each line does.
+
+\begin{lstlisting}
+// Below is MEL script commands used to load the plugin.
+
+// If the plugin is in the pluginsdir but does not autoload:
+loadPlugin visMesh;
+
+// Create a transform node so the mesh can be moved easily.
+createNode transform -n visMesh1;
+
+// Create a kMesh node that can be rendered.
+createNode mesh -n visMeshShape1 -p visMesh1;
+
+// Add a default shader to the mesh.
+sets -add initialShadingGroup visMeshShape1;
+
+// Create our actual node
+createNode visMesh -n visMeshNode1;
+
+// Connect the scenes time attribute to our input attribute.
+connectAttr time1.outTime visMeshNode1.time;
+
+// Connect the outputMesh from our node to the kMesh node.
+connectAttr visMeshNode1.outputMesh visMeshShape1.inMesh;
+\end{lstlisting}

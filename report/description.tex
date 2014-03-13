@@ -1,0 +1,27 @@
+\section{Problem Description}
+This section will outline the general problem that that I have attempted to
+solve during the course of this project.
+
+The goal of the project was to design and implement a piece of software that researchers in
+the Image-group could use to visualize the results of a Chan-Vese segmentation.
+This visualization was implemented as a plug-in for Autodesk Maya, a
+professional 3D program.
+
+The actual image segmentation is performed by a piece of software that Ulrik
+Bonde wrote, which I have been granted access to. The output data from this
+software is a moving tetrahedral mesh maintained by the DSC framework.
+Chan-Vese and DSC is described in sections \ref{sec:chanvese} and \ref{sec:dsc}
+respectively.
+
+The current method for visualizing the results of the segmentation is a
+simple OpenGL application that offers very little in the way of customization
+or render options. By switching to Maya, the researchers will gain an extremely
+powerful new render engine.
+
+In order to provide the researchers with a new tool they can use, I should
+implement a plugin for Maya that gives a simple GUI for retrieving the
+segmentation data and tweak the segmentation itself without having to actually
+leave Maya at any point.
+
+The rest of this report assumes the reader to be at least on-par with a
+bachelor in computer science or similar education.

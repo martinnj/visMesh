@@ -1,0 +1,142 @@
+\documentclass[10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage[pdftex]{color,graphicx}
+\usepackage{pdfpages}
+\usepackage{fancyhdr}
+\usepackage{textcomp}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{multicol}
+\usepackage{soul}
+\usepackage{url}
+\usepackage{algorithmic}
+\usepackage{wrapfig}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{mdwlist}
+\usepackage{pgfgantt}
+\usepackage[showframe=false]{geometry}
+\usepackage{changepage}
+\usepackage[bookmarks]{hyperref}
+\usepackage{listings}
+\usepackage{dirtree}
+\pagestyle{fancy}
+\usepackage[font=small,labelfont=bf]{caption}
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+\def\nosplit{\hfil\penalty 100 \hfilneg \hbox}
+\newcommand{\myurl}[1]{\url{#1}}
+%\newcommand{\myurl}[1]{\nosplit{\url{#1}}}
+\newcommand{\graphicc}[4]{\begin{figure}[H] \centering
+            \includegraphics[width={#1\textwidth}, keepaspectratio=true]{{#2}}
+            \caption{{#3}} \label{#4} \end{figure}}
+
+% Setup for lstlisting
+\lstset{language=C++,
+                basicstyle=\ttfamily,
+                keywordstyle=\color{blue}\ttfamily,
+                stringstyle=\color{red}\ttfamily,
+                commentstyle=\color{green}\ttfamily,
+                morecomment=[l][\color{magenta}]{\#}
+}
+
+%If in need of a header for the document, uncomment this and add desired text!
+%\fancyhead[LO,LE]{}
+%\fancyhead[RO,RE]{}
+%%%%%%%%%%%% END OF PREAMBLE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\begin{titlepage}
+
+\begin{center}
+
+\textsc{\LARGE Project Report}\\[1.5cm]
+
+\textsc{\Large DIKU Bachelor project}\\[0.5cm]
+
+\HRule \\[0.4cm]
+
+{ \bfseries Visualizing Chan-Vese segmentation results through the DSC datastructure in Autodesk Maya }\\[1cm]
+
+\HRule \\ [7.5cm]
+
+% Author and supervisor
+\begin{minipage}{0.5\textwidth}
+\begin{flushleft} \large
+Author:\\
+Martin Jørgensen (tzk173)\\
+\textit{martinnjorgensen@gmail.com}\\
+\vspace{0.5cm}
+\end{flushleft}
+\end{minipage}
+\begin{minipage}{0.4\textwidth}
+\begin{flushright} {\large
+\textbf{\today} }\\
+Supervisor(s):\\
+Kenny Erleben (kenny@diku.dk)\\
+Ulrik Bonde (bonde@diku.dk)
+\end{flushright}
+\end{minipage}
+
+\vfill
+
+% Bottom of the page front page
+
+
+\end{center}
+
+\end{titlepage}
+\clearpage
+
+% Abstract
+\input{abstract.tex}
+\newpage
+\tableofcontents
+\newpage
+
+% Introduction
+\input{introduction.tex}
+
+% Descripe the problem we want to solve
+\input{description.tex}
+
+% Background knowledge
+\input{dsc.tex}
+\input{chanvese.tex}
+% Description of the Maya DG and DAG. Other theoretical Maya things according to learning goals.
+\input{maya.tex}
+
+% Fluff for implementation
+%\input{analysis.tex} % 08-10-2013: Deprecated for a unified approach
+%\input{design.tex} % 08-10-2013: Deprecated for a unified approach
+\input{analysisdesign.tex}
+
+% Implementation stuff
+\input{implementation.tex}
+
+% Results, remember juicy images
+\input{results.tex}
+
+% Conclusion for the report
+\input{conclusion.tex}
+
+% What should be done next, improvements to what is etc.
+\input{future.tex}
+
+
+\newpage
+\appendix
+% Bibliography
+\input{bib.tex}
+
+% The bechmark results
+\input{benchmark.tex}
+
+% Compile/Usage guides
+%\input{guide.tex}
+
+\end{document}
